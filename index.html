@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8"/>
@@ -6,6 +7,7 @@
   <title>寫作</title>
 
   <!-- PWA -->
+
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#000000"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -143,13 +145,13 @@
       font-size: 0.7rem;
       font-weight: 300;
       letter-spacing: 0.12em;
-      color: rgba(240,236,228,0.12);
+      color: rgba(240,236,228,0);
       transition: color 0.6s ease;
       pointer-events: none;
       opacity: 0;
       animation: fadeIn 2.4s ease forwards 1.2s;
     }
-    #wordcount.visible { color: rgba(240,236,228,0.22); }
+    #wordcount.visible { color: rgba(240,236,228,0.85); }
 
     /* 儲存提示 */
     #saved {
@@ -186,6 +188,7 @@
     #editor::-webkit-scrollbar { display: none; }
     #editor { scrollbar-width: none; }
   </style>
+
 </head>
 <body>
 
@@ -287,14 +290,12 @@ const wc          = document.getElementById('wordcount');
 const savedMsg    = document.getElementById('saved');
 
 const STORAGE_KEY = 'focus-writer-content';
-let currentText   = localStorage.getItem(STORAGE_KEY) || '';
-let renderQueue   = [];
-let isRendering   = false;
+let lastText      = localStorage.getItem(STORAGE_KEY) || '';
+let isComposing   = false;
 
-// 初始載入：直接渲染已有文字（不播音效）
+// ── 渲染函式：完整重建 display（不播音效，用於載入/貼上）──
 function renderAll(text) {
   display.innerHTML = '';
-  // 把文字拆成 span，每個字一個，換行用 <br>
   for (let i = 0; i < text.length; i++) {
     if (text[i] === '\n') {
       display.appendChild(document.createElement('br'));
@@ -305,79 +306,89 @@ function renderAll(text) {
       display.appendChild(span);
     }
   }
-  editor.value = text;
   resizeEditor();
   updateWordCount(text);
   placeholder.style.opacity = text.length ? '0' : '1';
 }
 
-// 打字機：逐字出現
-function typeChar(char) {
-  return new Promise(resolve => {
+// ── 增量更新：只處理新增/刪除的部分 ──────────────
+function applyDiff(oldText, newText) {
+  if (newText === oldText) return;
+
+  // 找到共同前綴長度
+  let commonStart = 0;
+  while (commonStart < oldText.length && commonStart < newText.length
+         && oldText[commonStart] === newText[commonStart]) {
+    commonStart++;
+  }
+
+  const removedCount = oldText.length - commonStart;
+  const addedChars   = newText.slice(commonStart);
+
+  // 先刪掉尾端多餘節點
+  // display 的節點：每個字是 span，換行是 br
+  // 重建比追蹤節點更穩定，用 renderAll 處理刪除情況
+  if (removedCount > 0) {
+    renderAll(newText);
+    return;
+  }
+
+  // 只有新增：逐字 append（打字機效果）
+  for (const char of addedChars) {
     if (char === '\n') {
       display.appendChild(document.createElement('br'));
-      resolve();
     } else {
       const span = document.createElement('span');
-      span.className = 'char';
+      span.className = 'char'; // CSS 動畫
       span.textContent = char;
       display.appendChild(span);
-      // 等動畫跑完
-      setTimeout(resolve, 45);
     }
-  });
+  }
+
+  resizeEditor();
+  updateWordCount(newText);
+  placeholder.style.opacity = newText.length ? '0' : '1';
 }
 
-// 刪字
-function deleteLastChar(text) {
-  // 移除 display 最後一個節點
-  const last = display.lastChild;
-  if (last) display.removeChild(last);
-}
+// ── IME 事件 ──────────────────────────────────────
+editor.addEventListener('compositionstart', () => {
+  isComposing = true;
+});
 
-// 同步 editor → display
-let lastText = currentText;
+editor.addEventListener('compositionend', () => {
+  isComposing = false;
+  // iPadOS 的 compositionend 有時比 input 晚，用 setTimeout 確保拿到最終值
+  setTimeout(() => {
+    const newText = editor.value;
+    applyDiff(lastText, newText);
+    lastText = newText;
+    triggerSave();
+    playKeyClick();
+  }, 0);
+});
 
+// ── keydown：音效 ─────────────────────────────────
 editor.addEventListener('keydown', e => {
-  // 解鎖 AudioContext（iOS）
   if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (isComposing) return; // 組字中不播音效
 
   if (e.key === 'Enter') {
     playEnterClick();
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
-    // 刪除音效（較輕）
     playKeyClick();
   } else if (e.key.length === 1) {
     playKeyClick();
   }
 });
 
-editor.addEventListener('input', async () => {
+// ── input：非 IME 輸入（英文、數字、刪除等）────────
+editor.addEventListener('input', () => {
+  if (isComposing) return; // IME 組字中：完全不處理，交給 compositionend
+
   const newText = editor.value;
-  placeholder.style.opacity = newText.length ? '0' : '1';
-  resizeEditor();
-  updateWordCount(newText);
-  triggerSave();
-
-  // 比較差異
-  if (newText.length > lastText.length) {
-    // 新增字元：逐字打字機效果
-    const added = newText.slice(lastText.length);
-    for (const char of added) {
-      await typeChar(char);
-    }
-  } else if (newText.length < lastText.length) {
-    // 刪除：直接重新渲染（避免複雜的 diff）
-    const diff = lastText.length - newText.length;
-    for (let i = 0; i < diff; i++) {
-      deleteLastChar();
-    }
-  } else {
-    // 貼上或取代：整體重渲
-    renderAll(newText);
-  }
-
+  applyDiff(lastText, newText);
   lastText = newText;
+  triggerSave();
 });
 
 function resizeEditor() {
@@ -420,8 +431,8 @@ window.addEventListener('beforeunload', e => {
 
 // 載入
 window.addEventListener('load', () => {
-  renderAll(currentText);
-  lastText = currentText;
+  renderAll(lastText);
+  editor.value = lastText;
   setTimeout(() => { editor.focus(); }, 400);
 });
 
@@ -430,5 +441,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
+
 </body>
 </html>
