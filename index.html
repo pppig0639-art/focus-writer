@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8"/>
@@ -6,6 +7,7 @@
   <title>寫作</title>
 
   <!-- PWA -->
+
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#000000"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -27,12 +29,16 @@
       width: 100%; height: 100%;
       background: #000;
       overflow: hidden;
-      /* Safe area for notch phones */
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      padding:
+        env(safe-area-inset-top)
+        env(safe-area-inset-right)
+        env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
     }
 
     body { cursor: none; }
 
+    /* 自訂游標 */
     #cursor {
       position: fixed;
       width: 6px; height: 6px;
@@ -46,6 +52,7 @@
     }
     #cursor.hidden { opacity: 0; }
 
+    /* 主舞台 */
     #stage {
       position: fixed; inset: 0;
       display: flex;
@@ -54,31 +61,82 @@
       padding: 6vh 8vw;
     }
 
+    /* 打字機效果容器 */
+    #typewriter-wrap {
+      width: 100%;
+      max-width: 680px;
+      position: relative;
+    }
+
+    /* 實際隱藏的 textarea（接收輸入） */
     #editor {
-      width: 100%; max-width: 680px;
-      min-height: 2em;
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
       background: transparent;
       border: none; outline: none;
       resize: none; overflow: hidden;
+      color: transparent;
+      caret-color: var(--white);
+      font-family: 'Noto Serif TC', 'IM Fell English', serif;
+      font-weight: 300;
+      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+      line-height: 2;
+      letter-spacing: 0.04em;
+      z-index: 10;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 顯示文字的層（打字機動畫） */
+    #display {
+      width: 100%;
+      min-height: 2em;
       font-family: 'Noto Serif TC', 'IM Fell English', serif;
       font-weight: 300;
       font-size: clamp(1.1rem, 2.2vw, 1.45rem);
       line-height: 2;
       letter-spacing: 0.04em;
       color: var(--white);
-      caret-color: var(--white);
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
+      white-space: pre-wrap;
+      word-break: break-word;
+      pointer-events: none;
       opacity: 0;
       animation: fadeIn 1.8s ease forwards 0.3s;
+      position: relative;
+      z-index: 5;
     }
 
-    #editor::placeholder {
-      color: var(--dim);
-      font-style: italic;
+    /* 佔位文字 */
+    #placeholder {
+      position: absolute;
+      top: 0; left: 0;
       font-family: 'IM Fell English', serif;
+      font-style: italic;
+      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+      line-height: 2;
+      color: var(--dim);
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      z-index: 6;
     }
 
+    /* 打字機字元動畫 */
+    .char {
+      display: inline;
+      opacity: 0;
+      animation: charAppear 0.04s ease forwards;
+    }
+    .char.newline {
+      display: block;
+      height: 0;
+    }
+
+    @keyframes charAppear {
+      from { opacity: 0; transform: translateY(3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 字數統計 */
     #wordcount {
       position: fixed;
       bottom: calc(2.4vh + env(safe-area-inset-bottom));
@@ -111,9 +169,13 @@
     }
     #saved.show { opacity: 1; }
 
+    /* 邊緣暗角 */
     #vignette {
       position: fixed; inset: 0;
-      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
+      background: radial-gradient(ellipse at center,
+        transparent 40%,
+        rgba(0,0,0,0.55) 100%
+      );
       pointer-events: none; z-index: 1;
     }
 
@@ -126,6 +188,7 @@
     #editor::-webkit-scrollbar { display: none; }
     #editor { scrollbar-width: none; }
   </style>
+
 </head>
 <body>
 
@@ -134,87 +197,242 @@
 <div id="saved">已儲存</div>
 
 <div id="stage">
-  <textarea
-    id="editor"
-    placeholder="在這裡，只有你和文字。"
-    spellcheck="false"
-    autocomplete="off"
-    autocorrect="off"
-    autocapitalize="off"
-  ></textarea>
+  <div id="typewriter-wrap">
+    <div id="placeholder">在這裡，只有你和文字。</div>
+    <div id="display"></div>
+    <textarea
+      id="editor"
+      spellcheck="false"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+    ></textarea>
+  </div>
 </div>
 
 <div id="wordcount">0 字</div>
 
 <script>
-  // ── 自訂游標 ──────────────────────────────
-  const cursor = document.getElementById('cursor');
-  let cursorTimer;
-  document.addEventListener('mousemove', e => {
-    cursor.style.left = e.clientX + 'px';
-    cursor.style.top  = e.clientY + 'px';
-    cursor.classList.remove('hidden');
-    clearTimeout(cursorTimer);
-    cursorTimer = setTimeout(() => cursor.classList.add('hidden'), 2200);
+// ── 音效：用 Web Audio API 合成打字機聲，不需外部檔案 ──────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playKeyClick() {
+  try {
+    // 解鎖 AudioContext（iOS 需要使用者互動後才能播放）
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.08, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      // 白噪音快速衰減，模擬機械鍵盤敲擊
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 8);
+    }
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buf;
+
+    // 帶通濾波器，讓聲音更像打字機（800~3000Hz）
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    filter.Q.value = 0.8;
+
+    // 輕微音量
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.18;
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+  } catch(e) {}
+}
+
+function playEnterClick() {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 5);
+    }
+    const source = audioCtx.createBufferSource();
+    source.buffer = buf;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 600;
+    filter.Q.value = 0.5;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.28;
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+  } catch(e) {}
+}
+
+// ── 自訂游標 ──────────────────────────────────────
+const cursor = document.getElementById('cursor');
+let cursorTimer;
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top  = e.clientY + 'px';
+  cursor.classList.remove('hidden');
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => cursor.classList.add('hidden'), 2000);
+});
+
+// ── 編輯器核心 ────────────────────────────────────
+const editor      = document.getElementById('editor');
+const display     = document.getElementById('display');
+const placeholder = document.getElementById('placeholder');
+const wc          = document.getElementById('wordcount');
+const savedMsg    = document.getElementById('saved');
+
+const STORAGE_KEY = 'focus-writer-content';
+let currentText   = localStorage.getItem(STORAGE_KEY) || '';
+let renderQueue   = [];
+let isRendering   = false;
+
+// 初始載入：直接渲染已有文字（不播音效）
+function renderAll(text) {
+  display.innerHTML = '';
+  // 把文字拆成 span，每個字一個，換行用 <br>
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\n') {
+      display.appendChild(document.createElement('br'));
+    } else {
+      const span = document.createElement('span');
+      span.textContent = text[i];
+      span.style.opacity = '1';
+      display.appendChild(span);
+    }
+  }
+  editor.value = text;
+  resizeEditor();
+  updateWordCount(text);
+  placeholder.style.opacity = text.length ? '0' : '1';
+}
+
+// 打字機：逐字出現
+function typeChar(char) {
+  return new Promise(resolve => {
+    if (char === '\n') {
+      display.appendChild(document.createElement('br'));
+      resolve();
+    } else {
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = char;
+      display.appendChild(span);
+      // 等動畫跑完
+      setTimeout(resolve, 45);
+    }
   });
+}
 
-  // ── 編輯器 ────────────────────────────────
-  const editor   = document.getElementById('editor');
-  const wc       = document.getElementById('wordcount');
-  const savedMsg = document.getElementById('saved');
+// 刪字
+function deleteLastChar(text) {
+  // 移除 display 最後一個節點
+  const last = display.lastChild;
+  if (last) display.removeChild(last);
+}
 
-  // 讀取本地儲存
-  const STORAGE_KEY = 'focus-writer-content';
-  editor.value = localStorage.getItem(STORAGE_KEY) || '';
+// 同步 editor → display
+let lastText = currentText;
 
-  function resize() {
-    editor.style.height = 'auto';
-    editor.style.height = editor.scrollHeight + 'px';
+editor.addEventListener('keydown', e => {
+  // 解鎖 AudioContext（iOS）
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  if (e.key === 'Enter') {
+    playEnterClick();
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    // 刪除音效（較輕）
+    playKeyClick();
+  } else if (e.key.length === 1) {
+    playKeyClick();
+  }
+});
+
+editor.addEventListener('input', async () => {
+  const newText = editor.value;
+  placeholder.style.opacity = newText.length ? '0' : '1';
+  resizeEditor();
+  updateWordCount(newText);
+  triggerSave();
+
+  // 比較差異
+  if (newText.length > lastText.length) {
+    // 新增字元：逐字打字機效果
+    const added = newText.slice(lastText.length);
+    for (const char of added) {
+      await typeChar(char);
+    }
+  } else if (newText.length < lastText.length) {
+    // 刪除：直接重新渲染（避免複雜的 diff）
+    const diff = lastText.length - newText.length;
+    for (let i = 0; i < diff; i++) {
+      deleteLastChar();
+    }
+  } else {
+    // 貼上或取代：整體重渲
+    renderAll(newText);
   }
 
-  function countWords(text) {
-    if (!text.trim()) return 0;
-    const cjk     = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
-    const western  = (text.trim().match(/[a-zA-Z]+/g) || []).length;
-    return cjk + western;
-  }
+  lastText = newText;
+});
 
-  let saveTimer, savedTimer;
-  function saveContent() {
+function resizeEditor() {
+  editor.style.height = 'auto';
+  editor.style.height = Math.max(display.offsetHeight, 40) + 'px';
+}
+
+function countWords(text) {
+  if (!text.trim()) return 0;
+  const cjk     = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+  const western = (text.trim().match(/[a-zA-Z]+/g) || []).length;
+  return cjk + western;
+}
+
+function updateWordCount(text) {
+  const n = countWords(text);
+  wc.textContent = n + ' 字';
+  wc.classList.toggle('visible', n > 0);
+}
+
+let saveTimer, savedTimer;
+function triggerSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
     localStorage.setItem(STORAGE_KEY, editor.value);
     savedMsg.classList.add('show');
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => savedMsg.classList.remove('show'), 1500);
+  }, 1000);
+}
+
+// 防誤關
+window.addEventListener('beforeunload', e => {
+  if (editor.value.trim().length > 0) {
+    localStorage.setItem(STORAGE_KEY, editor.value);
+    e.preventDefault();
+    e.returnValue = '';
   }
+});
 
-  editor.addEventListener('input', () => {
-    resize();
-    const n = countWords(editor.value);
-    wc.textContent = n + ' 字';
-    wc.classList.toggle('visible', n > 0);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveContent, 1000);
-  });
+// 載入
+window.addEventListener('load', () => {
+  renderAll(currentText);
+  lastText = currentText;
+  setTimeout(() => { editor.focus(); }, 400);
+});
 
-  window.addEventListener('load', () => {
-    setTimeout(() => { editor.focus(); resize(); }, 400);
-    const n = countWords(editor.value);
-    wc.textContent = n + ' 字';
-    wc.classList.toggle('visible', n > 0);
-  });
-
-  window.addEventListener('beforeunload', e => {
-    if (editor.value.trim().length > 0) {
-      saveContent();
-      e.preventDefault();
-      e.returnValue = '';
-    }
-  });
-
-  // ── Service Worker 註冊 ───────────────────
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
+
 </body>
 </html>
