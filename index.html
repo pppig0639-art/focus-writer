@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>寫作</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#000000"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+  <meta name="apple-mobile-web-app-title" content="寫作"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet"/>
+
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --white: #f0ece4;
+      --dim: rgba(240,236,228,0.18);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      /* Safe area for notch phones */
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    body { cursor: none; }
+
+    #cursor {
+      position: fixed;
+      width: 6px; height: 6px;
+      background: var(--white);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%,-50%);
+      transition: opacity 0.4s ease;
+      mix-blend-mode: difference;
+    }
+    #cursor.hidden { opacity: 0; }
+
+    #stage {
+      position: fixed; inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6vh 8vw;
+    }
+
+    #editor {
+      width: 100%; max-width: 680px;
+      min-height: 2em;
+      background: transparent;
+      border: none; outline: none;
+      resize: none; overflow: hidden;
+      font-family: 'Noto Serif TC', 'IM Fell English', serif;
+      font-weight: 300;
+      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+      line-height: 2;
+      letter-spacing: 0.04em;
+      color: var(--white);
+      caret-color: var(--white);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      opacity: 0;
+      animation: fadeIn 1.8s ease forwards 0.3s;
+    }
+
+    #editor::placeholder {
+      color: var(--dim);
+      font-style: italic;
+      font-family: 'IM Fell English', serif;
+    }
+
+    #wordcount {
+      position: fixed;
+      bottom: calc(2.4vh + env(safe-area-inset-bottom));
+      right: calc(3vw + env(safe-area-inset-right));
+      font-family: 'Noto Serif TC', serif;
+      font-size: 0.7rem;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      color: rgba(240,236,228,0.12);
+      transition: color 0.6s ease;
+      pointer-events: none;
+      opacity: 0;
+      animation: fadeIn 2.4s ease forwards 1.2s;
+    }
+    #wordcount.visible { color: rgba(240,236,228,0.22); }
+
+    /* 儲存提示 */
+    #saved {
+      position: fixed;
+      top: calc(2vh + env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Noto Serif TC', serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: rgba(240,236,228,0.3);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    #saved.show { opacity: 1; }
+
+    #vignette {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
+      pointer-events: none; z-index: 1;
+    }
+
+    @keyframes fadeIn {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    ::selection { background: rgba(240,236,228,0.15); color: var(--white); }
+    #editor::-webkit-scrollbar { display: none; }
+    #editor { scrollbar-width: none; }
+  </style>
+</head>
+<body>
+
+<div id="vignette"></div>
+<div id="cursor"></div>
+<div id="saved">已儲存</div>
+
+<div id="stage">
+  <textarea
+    id="editor"
+    placeholder="在這裡，只有你和文字。"
+    spellcheck="false"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+  ></textarea>
+</div>
+
+<div id="wordcount">0 字</div>
+
+<script>
+  // ── 自訂游標 ──────────────────────────────
+  const cursor = document.getElementById('cursor');
+  let cursorTimer;
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+    cursor.classList.remove('hidden');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => cursor.classList.add('hidden'), 2200);
+  });
+
+  // ── 編輯器 ────────────────────────────────
+  const editor   = document.getElementById('editor');
+  const wc       = document.getElementById('wordcount');
+  const savedMsg = document.getElementById('saved');
+
+  // 讀取本地儲存
+  const STORAGE_KEY = 'focus-writer-content';
+  editor.value = localStorage.getItem(STORAGE_KEY) || '';
+
+  function resize() {
+    editor.style.height = 'auto';
+    editor.style.height = editor.scrollHeight + 'px';
+  }
+
+  function countWords(text) {
+    if (!text.trim()) return 0;
+    const cjk     = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+    const western  = (text.trim().match(/[a-zA-Z]+/g) || []).length;
+    return cjk + western;
+  }
+
+  let saveTimer, savedTimer;
+  function saveContent() {
+    localStorage.setItem(STORAGE_KEY, editor.value);
+    savedMsg.classList.add('show');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => savedMsg.classList.remove('show'), 1500);
+  }
+
+  editor.addEventListener('input', () => {
+    resize();
+    const n = countWords(editor.value);
+    wc.textContent = n + ' 字';
+    wc.classList.toggle('visible', n > 0);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveContent, 1000);
+  });
+
+  window.addEventListener('load', () => {
+    setTimeout(() => { editor.focus(); resize(); }, 400);
+    const n = countWords(editor.value);
+    wc.textContent = n + ' 字';
+    wc.classList.toggle('visible', n > 0);
+  });
+
+  window.addEventListener('beforeunload', e => {
+    if (editor.value.trim().length > 0) {
+      saveContent();
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // ── Service Worker 註冊 ───────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
