@@ -26,9 +26,9 @@
     }
 
     html, body {
-      width: 100%; height: 100%;
-      background: #000;
-      overflow: hidden;
+      width:100%; height:100%;
+      background:#000;
+      overflow:hidden;
       padding:
         env(safe-area-inset-top)
         env(safe-area-inset-right)
@@ -40,143 +40,95 @@
 
     /* 自訂游標 */
     #cursor {
-      position: fixed;
-      width: 6px; height: 6px;
-      background: var(--white);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 9999;
-      transform: translate(-50%,-50%);
-      transition: opacity 0.4s ease;
-      mix-blend-mode: difference;
+      position:fixed;
+      width:6px; height:6px;
+      background:var(--white);
+      border-radius:50%;
+      pointer-events:none;
+      z-index:9999;
+      transform:translate(-50%,-50%);
+      transition:opacity 0.4s ease;
+      mix-blend-mode:difference;
     }
-    #cursor.hidden { opacity: 0; }
+    #cursor.hidden { opacity:0; }
 
     /* 主舞台 */
     #stage {
-      position: fixed; inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6vh 8vw;
+      position:fixed; inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:6vh 8vw;
     }
 
-    /* 打字機效果容器 */
-    #typewriter-wrap {
-      width: 100%;
-      max-width: 680px;
-      position: relative;
-    }
-
-    /* 實際隱藏的 textarea（接收輸入） */
+    /* textarea — 唯一的文字層，簡單可靠 */
     #editor {
-      position: absolute;
-      inset: 0;
-      width: 100%; height: 100%;
-      background: transparent;
-      border: none; outline: none;
-      resize: none; overflow: hidden;
-      color: transparent;
-      caret-color: var(--white);
-      font-family: 'Noto Serif TC', 'IM Fell English', serif;
-      font-weight: 300;
-      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
-      line-height: 2;
-      letter-spacing: 0.04em;
-      z-index: 10;
-      -webkit-font-smoothing: antialiased;
+      width:100%;
+      max-width:680px;
+      min-height:2em;
+      background:transparent;
+      border:none; outline:none;
+      resize:none; overflow:hidden;
+      font-family:'Noto Serif TC','IM Fell English',serif;
+      font-weight:300;
+      font-size:clamp(1.1rem, 2.2vw, 1.45rem);
+      line-height:2;
+      letter-spacing:0.04em;
+      color:var(--white);
+      caret-color:var(--white);
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+      opacity:0;
+      animation:fadeIn 1.4s ease forwards 0.2s;
     }
 
-    /* 顯示文字的層（打字機動畫） */
-    #display {
-      width: 100%;
-      min-height: 2em;
-      font-family: 'Noto Serif TC', 'IM Fell English', serif;
-      font-weight: 300;
-      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
-      line-height: 2;
-      letter-spacing: 0.04em;
-      color: var(--white);
-      white-space: pre-wrap;
-      word-break: break-word;
-      pointer-events: none;
-      opacity: 0;
-      animation: fadeIn 1.8s ease forwards 0.3s;
-      position: relative;
-      z-index: 5;
-    }
-
-    /* 佔位文字 */
-    #placeholder {
-      position: absolute;
-      top: 0; left: 0;
-      font-family: 'IM Fell English', serif;
-      font-style: italic;
-      font-size: clamp(1.1rem, 2.2vw, 1.45rem);
-      line-height: 2;
-      color: var(--dim);
-      pointer-events: none;
-      transition: opacity 0.4s ease;
-      z-index: 6;
-    }
-
-    /* 打字機字元動畫 */
-    .char {
-      display: inline;
-      opacity: 0;
-      animation: charAppear 0.04s ease forwards;
-    }
-    .char.newline {
-      display: block;
-      height: 0;
-    }
-
-    @keyframes charAppear {
-      from { opacity: 0; transform: translateY(3px); }
-      to   { opacity: 1; transform: translateY(0); }
+    #editor::placeholder {
+      color:var(--dim);
+      font-style:italic;
+      font-family:'IM Fell English',serif;
     }
 
     /* 字數統計 */
     #wordcount {
-      position: fixed;
-      bottom: calc(2.4vh + env(safe-area-inset-bottom));
-      right: calc(3vw + env(safe-area-inset-right));
-      font-family: 'Noto Serif TC', serif;
-      font-size: 0.7rem;
-      font-weight: 300;
-      letter-spacing: 0.12em;
-      color: rgba(240,236,228,0);
-      transition: color 0.6s ease;
-      pointer-events: none;
-      opacity: 0;
-      animation: fadeIn 2.4s ease forwards 1.2s;
+      position:fixed;
+      bottom:calc(2.4vh + env(safe-area-inset-bottom));
+      right:calc(3vw + env(safe-area-inset-right));
+      font-family:'Noto Serif TC',serif;
+      font-size:0.7rem;
+      font-weight:300;
+      letter-spacing:0.12em;
+      color:transparent;
+      transition:color 0.6s ease;
+      pointer-events:none;
+      opacity:0;
+      animation:fadeIn 2s ease forwards 1s;
     }
-    #wordcount.visible { color: rgba(240,236,228,0.85); }
+    #wordcount.visible { color:rgba(240,236,228,0.85); }
 
     /* 儲存提示 */
     #saved {
-      position: fixed;
-      top: calc(2vh + env(safe-area-inset-top));
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Noto Serif TC', serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: rgba(240,236,228,0.3);
-      opacity: 0;
-      transition: opacity 0.5s ease;
-      pointer-events: none;
+      position:fixed;
+      top:calc(2vh + env(safe-area-inset-top));
+      left:50%;
+      transform:translateX(-50%);
+      font-family:'Noto Serif TC',serif;
+      font-size:0.65rem;
+      letter-spacing:0.15em;
+      color:rgba(240,236,228,0.35);
+      opacity:0;
+      transition:opacity 0.5s ease;
+      pointer-events:none;
     }
-    #saved.show { opacity: 1; }
+    #saved.show { opacity:1; }
 
     /* 邊緣暗角 */
     #vignette {
-      position: fixed; inset: 0;
-      background: radial-gradient(ellipse at center,
+      position:fixed; inset:0;
+      background:radial-gradient(ellipse at center,
         transparent 40%,
         rgba(0,0,0,0.55) 100%
       );
-      pointer-events: none; z-index: 1;
+      pointer-events:none; z-index:1;
     }
 
     @keyframes fadeIn {
@@ -184,9 +136,9 @@
       to   { opacity:1; transform:translateY(0); }
     }
 
-    ::selection { background: rgba(240,236,228,0.15); color: var(--white); }
-    #editor::-webkit-scrollbar { display: none; }
-    #editor { scrollbar-width: none; }
+    ::selection { background:rgba(240,236,228,0.15); color:var(--white); }
+    #editor::-webkit-scrollbar { display:none; }
+    #editor { scrollbar-width:none; }
   </style>
 
 </head>
@@ -197,81 +149,49 @@
 <div id="saved">已儲存</div>
 
 <div id="stage">
-  <div id="typewriter-wrap">
-    <div id="placeholder">在這裡，只有你和文字。</div>
-    <div id="display"></div>
-    <textarea
-      id="editor"
-      spellcheck="false"
-      autocomplete="off"
-      autocorrect="off"
-      autocapitalize="off"
-    ></textarea>
-  </div>
+  <textarea
+    id="editor"
+    placeholder="在這裡，只有你和文字。"
+    spellcheck="false"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+  ></textarea>
 </div>
 
 <div id="wordcount">0 字</div>
 
 <script>
-// ── 音效：用 Web Audio API 合成打字機聲，不需外部檔案 ──────
+// ── 音效：Web Audio 合成打字機聲 ──────────────────
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-function playKeyClick() {
+function playClick(freq, duration, vol) {
   try {
-    // 解鎖 AudioContext（iOS 需要使用者互動後才能播放）
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.08, audioCtx.sampleRate);
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) {
-      // 白噪音快速衰減，模擬機械鍵盤敲擊
       data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 8);
     }
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = buf;
-
-    // 帶通濾波器，讓聲音更像打字機（800~3000Hz）
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
     const filter = audioCtx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 1800;
+    filter.frequency.value = freq;
     filter.Q.value = 0.8;
-
-    // 輕微音量
     const gain = audioCtx.createGain();
-    gain.gain.value = 0.18;
-
-    source.connect(filter);
+    gain.gain.value = vol;
+    src.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx.destination);
-    source.start();
+    src.start();
   } catch(e) {}
 }
 
-function playEnterClick() {
-  try {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 5);
-    }
-    const source = audioCtx.createBufferSource();
-    source.buffer = buf;
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 600;
-    filter.Q.value = 0.5;
-    const gain = audioCtx.createGain();
-    gain.gain.value = 0.28;
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioCtx.destination);
-    source.start();
-  } catch(e) {}
-}
+const playKeyClick   = () => playClick(1800, 0.08, 0.18);
+const playEnterClick = () => playClick(600,  0.12, 0.28);
 
-// ── 自訂游標 ──────────────────────────────────────
+// ── 游標 ──────────────────────────────────────────
 const cursor = document.getElementById('cursor');
 let cursorTimer;
 document.addEventListener('mousemove', e => {
@@ -282,133 +202,33 @@ document.addEventListener('mousemove', e => {
   cursorTimer = setTimeout(() => cursor.classList.add('hidden'), 2000);
 });
 
-// ── 編輯器核心 ────────────────────────────────────
-const editor      = document.getElementById('editor');
-const display     = document.getElementById('display');
-const placeholder = document.getElementById('placeholder');
-const wc          = document.getElementById('wordcount');
-const savedMsg    = document.getElementById('saved');
+// ── 編輯器 ────────────────────────────────────────
+const editor   = document.getElementById('editor');
+const wc       = document.getElementById('wordcount');
+const savedMsg = document.getElementById('saved');
 
 const STORAGE_KEY = 'focus-writer-content';
-let lastText      = localStorage.getItem(STORAGE_KEY) || '';
-let isComposing   = false;
 
-// ── 渲染函式：完整重建 display（不播音效，用於載入/貼上）──
-function renderAll(text) {
-  display.innerHTML = '';
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '\n') {
-      display.appendChild(document.createElement('br'));
-    } else {
-      const span = document.createElement('span');
-      span.textContent = text[i];
-      span.style.opacity = '1';
-      display.appendChild(span);
-    }
-  }
-  resizeEditor();
-  updateWordCount(text);
-  placeholder.style.opacity = text.length ? '0' : '1';
-}
+// 載入儲存內容
+editor.value = localStorage.getItem(STORAGE_KEY) || '';
 
-// ── 增量更新：只處理新增/刪除的部分 ──────────────
-function applyDiff(oldText, newText) {
-  if (newText === oldText) return;
-
-  // 找到共同前綴長度
-  let commonStart = 0;
-  while (commonStart < oldText.length && commonStart < newText.length
-         && oldText[commonStart] === newText[commonStart]) {
-    commonStart++;
-  }
-
-  const removedCount = oldText.length - commonStart;
-  const addedChars   = newText.slice(commonStart);
-
-  // 先刪掉尾端多餘節點
-  // display 的節點：每個字是 span，換行是 br
-  // 重建比追蹤節點更穩定，用 renderAll 處理刪除情況
-  if (removedCount > 0) {
-    renderAll(newText);
-    return;
-  }
-
-  // 只有新增：逐字 append（打字機效果）
-  for (const char of addedChars) {
-    if (char === '\n') {
-      display.appendChild(document.createElement('br'));
-    } else {
-      const span = document.createElement('span');
-      span.className = 'char'; // CSS 動畫
-      span.textContent = char;
-      display.appendChild(span);
-    }
-  }
-
-  resizeEditor();
-  updateWordCount(newText);
-  placeholder.style.opacity = newText.length ? '0' : '1';
-}
-
-// ── IME 事件 ──────────────────────────────────────
-editor.addEventListener('compositionstart', () => {
-  isComposing = true;
-});
-
-editor.addEventListener('compositionend', () => {
-  isComposing = false;
-  // iPadOS 的 compositionend 有時比 input 晚，用 setTimeout 確保拿到最終值
-  setTimeout(() => {
-    const newText = editor.value;
-    applyDiff(lastText, newText);
-    lastText = newText;
-    triggerSave();
-    playKeyClick();
-  }, 0);
-});
-
-// ── keydown：音效 ─────────────────────────────────
-editor.addEventListener('keydown', e => {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  if (isComposing) return; // 組字中不播音效
-
-  if (e.key === 'Enter') {
-    playEnterClick();
-  } else if (e.key === 'Backspace' || e.key === 'Delete') {
-    playKeyClick();
-  } else if (e.key.length === 1) {
-    playKeyClick();
-  }
-});
-
-// ── input：非 IME 輸入（英文、數字、刪除等）────────
-editor.addEventListener('input', () => {
-  if (isComposing) return; // IME 組字中：完全不處理，交給 compositionend
-
-  const newText = editor.value;
-  applyDiff(lastText, newText);
-  lastText = newText;
-  triggerSave();
-});
-
-function resizeEditor() {
+// 自動調整高度
+function resize() {
   editor.style.height = 'auto';
-  editor.style.height = Math.max(display.offsetHeight, 40) + 'px';
+  editor.style.height = editor.scrollHeight + 'px';
 }
 
-function countWords(text) {
-  if (!text.trim()) return 0;
+// 字數統計
+function updateWordCount() {
+  const text = editor.value;
   const cjk     = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
   const western = (text.trim().match(/[a-zA-Z]+/g) || []).length;
-  return cjk + western;
-}
-
-function updateWordCount(text) {
-  const n = countWords(text);
+  const n = cjk + western;
   wc.textContent = n + ' 字';
   wc.classList.toggle('visible', n > 0);
 }
 
+// 自動儲存
 let saveTimer, savedTimer;
 function triggerSave() {
   clearTimeout(saveTimer);
@@ -417,23 +237,71 @@ function triggerSave() {
     savedMsg.classList.add('show');
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => savedMsg.classList.remove('show'), 1500);
-  }, 1000);
+  }, 800);
 }
+
+// ── IME 處理（注音／倉頡等）────────────────────────
+let isComposing = false;
+
+editor.addEventListener('compositionstart', () => {
+  isComposing = true;
+});
+
+editor.addEventListener('compositionend', () => {
+  isComposing = false;
+  resize();
+  updateWordCount();
+  triggerSave();
+  playKeyClick();
+});
+
+// 一般輸入（英文、數字、刪除）
+editor.addEventListener('input', () => {
+  if (isComposing) return; // IME 組字中完全忽略
+  resize();
+  updateWordCount();
+  triggerSave();
+});
+
+// 音效（keydown）— 永遠觸發，不管 IME 狀態
+editor.addEventListener('keydown', e => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  if (e.key === 'Enter') {
+    // Enter：低頻厚重，像打字機換行
+    playClick(500, 0.14, 0.32);
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    // 刪除：中頻偏軟
+    playClick(1200, 0.07, 0.13);
+  } else if (e.key === ' ') {
+    // 空白鍵：稍重
+    playClick(1400, 0.09, 0.20);
+  } else if (e.key === 'Shift' || e.key === 'CapsLock' ||
+             e.key === 'Control' || e.key === 'Alt' ||
+             e.key === 'Meta' || e.key === 'Tab') {
+    // 功能鍵：不發聲
+  } else {
+    // 一般字符：隨機微調頻率，讓每個字聽起來略有不同
+    const freq = 1600 + Math.random() * 600; // 1600~2200Hz
+    const vol  = 0.14 + Math.random() * 0.08; // 0.14~0.22
+    playClick(freq, 0.08, vol);
+  }
+});
 
 // 防誤關
 window.addEventListener('beforeunload', e => {
-  if (editor.value.trim().length > 0) {
+  if (editor.value.trim()) {
     localStorage.setItem(STORAGE_KEY, editor.value);
     e.preventDefault();
     e.returnValue = '';
   }
 });
 
-// 載入
+// 初始化
 window.addEventListener('load', () => {
-  renderAll(lastText);
-  editor.value = lastText;
-  setTimeout(() => { editor.focus(); }, 400);
+  resize();
+  updateWordCount();
+  setTimeout(() => editor.focus(), 300);
 });
 
 // Service Worker
